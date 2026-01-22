@@ -51,15 +51,29 @@ function App() {
 
   // Check for password recovery token in URL and set auth mode accordingly
   useEffect(() => {
-    const hashParams = new URLSearchParams(window.location.hash.substring(1));
-    const type = hashParams.get('type');
-    const accessToken = hashParams.get('access_token');
+    const hash = window.location.hash;
+    console.log('App checking for recovery - hash:', hash, 'isPasswordRecovery:', isPasswordRecovery);
     
-    // If we have a recovery token in the URL OR isPasswordRecovery is true, switch to reset mode
-    if ((type === 'recovery' && accessToken) || isPasswordRecovery) {
+    if (hash && hash.length > 1) {
+      const hashParams = new URLSearchParams(hash.substring(1));
+      const type = hashParams.get('type');
+      const accessToken = hashParams.get('access_token');
+      console.log('Hash params:', { type, hasAccessToken: !!accessToken });
+      
+      // If we have a recovery token in the URL, switch to reset mode
+      if (type === 'recovery' && accessToken) {
+        console.log('Setting auth mode to reset from URL hash');
+        setAuthMode('reset');
+        // Don't clear the hash immediately - let Supabase process it first
+        // The hash will be cleared after successful password reset
+        return;
+      }
+    }
+    
+    // If Supabase detected password recovery, switch to reset mode
+    if (isPasswordRecovery) {
+      console.log('Setting auth mode to reset from isPasswordRecovery flag');
       setAuthMode('reset');
-      // Don't clear the hash immediately - let Supabase process it first
-      // The hash will be cleared after successful password reset
     }
   }, [isPasswordRecovery]);
 
