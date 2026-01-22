@@ -20,14 +20,22 @@ export function useSupabase() {
   });
 
   useEffect(() => {
+    // Helper function to check if URL contains recovery token
+    const checkForRecoveryToken = (): boolean => {
+      const hashParams = new URLSearchParams(window.location.hash.substring(1));
+      const type = hashParams.get('type');
+      return type === 'recovery';
+    };
+
     // Get initial session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
+      const isRecovery = checkForRecoveryToken();
       setAuthState({
         user: session?.user ?? null,
         session,
         loading: false,
         error: error?.message ?? null,
-        isPasswordRecovery: false,
+        isPasswordRecovery: isRecovery,
       });
     });
 
@@ -35,9 +43,13 @@ export function useSupabase() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      // Check URL for recovery token - this handles cases where Supabase processes
+      // the recovery token and creates a session before PASSWORD_RECOVERY event fires
+      const isRecovery = event === 'PASSWORD_RECOVERY' || checkForRecoveryToken();
+      
       // Handle password recovery event - keep session for updateUser to work
       // but set flag so user isn't considered "authenticated" for UI purposes
-      if (event === 'PASSWORD_RECOVERY') {
+      if (isRecovery) {
         setAuthState({
           user: session?.user ?? null,
           session, // Keep session so updateUser can work
@@ -192,20 +204,23 @@ export function useSupabase() {
     } catch (error) {
       const authError = error as AuthError;
       let errorMessage = authError.message;
+      const statusCode = authError.status || (error as any)?.status;
       
       console.error('Password reset email failed:', {
         error: authError,
         message: errorMessage,
-        code: authError.status,
+        statusCode: statusCode,
       });
       
       // Provide more helpful error messages
-      if (errorMessage.includes('rate limit') || errorMessage.includes('too many')) {
-        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      if (statusCode === 429 || errorMessage.includes('rate limit') || errorMessage.includes('too many') || errorMessage.includes('429')) {
+        errorMessage = 'Too many password reset requests. Please wait 15-30 minutes before requesting another email, or check your spam folder for the previous email.';
       } else if (errorMessage.includes('not found') || errorMessage.includes('user not found')) {
         errorMessage = 'No account found with this email address.';
       } else if (errorMessage.includes('email')) {
         errorMessage = `Email error: ${errorMessage}`;
+      } else if (!errorMessage || errorMessage === '') {
+        errorMessage = 'Failed to send password reset email. Please try again later.';
       }
       
       setAuthState((prev) => ({

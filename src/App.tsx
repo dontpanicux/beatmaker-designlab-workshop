@@ -49,20 +49,17 @@ function App() {
   // Track the previous user ID to detect user changes
   const previousUserIdRef = useRef<string | undefined>(user?.id);
 
-  // Check for password recovery token in URL on mount
+  // Check for password recovery token in URL and set auth mode accordingly
   useEffect(() => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
     const accessToken = hashParams.get('access_token');
     
-    // If we have a recovery token in the URL, switch to reset mode
-    if (type === 'recovery' && accessToken) {
+    // If we have a recovery token in the URL OR isPasswordRecovery is true, switch to reset mode
+    if ((type === 'recovery' && accessToken) || isPasswordRecovery) {
       setAuthMode('reset');
       // Don't clear the hash immediately - let Supabase process it first
       // The hash will be cleared after successful password reset
-    } else if (isPasswordRecovery) {
-      // If Supabase detected password recovery event, switch to reset mode
-      setAuthMode('reset');
     }
   }, [isPasswordRecovery]);
 
