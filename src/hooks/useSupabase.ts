@@ -20,28 +20,53 @@ export function useSupabase() {
   });
 
   useEffect(() => {
+    // Track if we've detected recovery - persist this so it doesn't get lost
+    let recoveryDetected = false;
+
     // Helper function to check if URL contains recovery token
     const checkForRecoveryToken = (): boolean => {
       const hash = window.location.hash;
       console.log('Checking URL hash:', hash);
-      if (!hash || hash.length <= 1) return false;
+      if (!hash || hash.length <= 1) {
+        // If hash is empty but we previously detected recovery, keep it
+        return recoveryDetected;
+      }
       
       const hashParams = new URLSearchParams(hash.substring(1));
       const type = hashParams.get('type');
       const accessToken = hashParams.get('access_token');
       console.log('Hash params - type:', type, 'access_token:', accessToken ? 'present' : 'missing');
-      return type === 'recovery' && !!accessToken;
+      
+      const isRecovery = type === 'recovery' && !!accessToken;
+      if (isRecovery) {
+        recoveryDetected = true; // Persist the recovery state
+      }
+      return isRecovery;
     };
+
+    // Check hash immediately on mount (before Supabase processes it)
+    const initialHash = window.location.hash;
+    if (initialHash && initialHash.length > 1) {
+      const hashParams = new URLSearchParams(initialHash.substring(1));
+      const type = hashParams.get('type');
+      const accessToken = hashParams.get('access_token');
+      if (type === 'recovery' && accessToken) {
+        recoveryDetected = true;
+        console.log('Recovery detected from initial hash check');
+      }
+    }
 
     // Get initial session
     supabase.auth.getSession().then(({ data: { session }, error }) => {
       console.log('Initial session check:', { 
         hasSession: !!session, 
         hasUser: !!session?.user,
-        hash: window.location.hash 
+        hash: window.location.hash,
+        recoveryDetected
       });
       
-      const isRecovery = checkForRecoveryToken();
+      // Use persisted recovery state
+      const isRecovery = recoveryDetected || checkForRecoveryToken();
       console.log('Is recovery from URL check:', isRecovery);
       
       setAuthState({
@@ -57,12 +82,17 @@ export function useSupabase() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state change:', { event, hasSession: !!session, hash: window.location.hash });
+      console.log('Auth state change:', { event, hasSession: !!session, hash: window.location.hash, recoveryDetected });
       
-      // Check URL for recovery token - this handles cases where Supabase processes
-      // the recovery token and creates a session before PASSWORD_RECOVERY event fires
-      const isRecovery = event === 'PASSWORD_RECOVERY' || checkForRecoveryToken();
-      console.log('Is recovery:', isRecovery, 'from event:', event === 'PASSWORD_RECOVERY');
+      // Check URL for recovery token OR use persisted recovery state
+      // This handles cases where Supabase processes the recovery token and creates a session
+      const isRecovery = event === 'PASSWORD_RECOVERY' || recoveryDetected || checkForRecoveryToken();
+      console.log('Is recovery:', isRecovery, 'from event:', event === 'PASSWORD_RECOVERY', 'from persisted:', recoveryDetected);
+      
+      // If PASSWORD_RECOVERY event fires, persist it
+      if (event === 'PASSWORD_RECOVERY') {
+        recoveryDetected = true;
+      }
       
       // Handle password recovery event - keep session for updateUser to work
       // but set flag so user isn't considered "authenticated" for UI purposes
