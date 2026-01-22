@@ -27,6 +27,7 @@ export function useSupabase() {
         session,
         loading: false,
         error: error?.message ?? null,
+        isPasswordRecovery: false,
       });
     });
 
@@ -74,6 +75,7 @@ export function useSupabase() {
         session: data.session,
         loading: false,
         error: null,
+        isPasswordRecovery: false,
       });
 
       return { user: data.user, session: data.session, error: null };
@@ -107,6 +109,7 @@ export function useSupabase() {
         session: data.session,
         loading: false,
         error: null,
+        isPasswordRecovery: false,
       });
 
       return { user: data.user, session: data.session, error: null };
