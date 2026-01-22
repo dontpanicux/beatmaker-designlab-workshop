@@ -1,0 +1,15 @@
+[build]
+  # Build command for Vite + TypeScript
+  command = "npm run build"
+  # Vite outputs to 'dist' directory
+  publish = "dist"
+
+[build.environment]
+  # Node version - using a recent LTS version
+  NODE_VERSION = "20"
+
+# Redirect rules for SPA routing (if you add routing later)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

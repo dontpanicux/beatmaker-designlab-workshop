@@ -81,6 +81,48 @@ npm run build
 
 The built files will be in the `dist` directory.
 
+## Deployment
+
+### Deploying to Netlify
+
+This project is configured for easy deployment to Netlify. Follow these steps:
+
+1. **Push your code to GitHub** (if you haven't already):
+   ```bash
+   git add .
+   git commit -m "Ready for deployment"
+   git push
+   ```
+
+2. **Connect to Netlify**:
+   - Go to [netlify.com](https://netlify.com) and sign up/login
+   - Click "Add new site" → "Import an existing project"
+   - Choose "GitHub" and authorize Netlify
+   - Select your repository: `beatmaker-designlab-workshop`
+
+3. **Configure Build Settings** (should auto-detect from `netlify.toml`):
+   - Build command: `npm run build`
+   - Publish directory: `dist`
+   - Node version: `20` (or latest LTS)
+
+4. **Set Environment Variables**:
+   - Go to Site settings → Environment variables
+   - Add the following variables:
+     - `VITE_SUPABASE_URL` - Your Supabase project URL
+     - `VITE_SUPABASE_ANON_KEY` - Your Supabase anon key
+   - These are the same values from your local `.env` file
+
+5. **Deploy**:
+   - Click "Deploy site"
+   - Netlify will build and deploy your site
+   - Your site will be live at a URL like `https://your-site-name.netlify.app`
+
+6. **Custom Domain** (optional):
+   - Go to Site settings → Domain management
+   - Add your custom domain if desired
+
+**Note**: The `netlify.toml` file is already configured with the correct build settings and SPA redirect rules.
+
 ## Project Structure
 
 ```
