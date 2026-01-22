@@ -167,12 +167,21 @@ export function useSupabase() {
     try {
       // Use the current origin - Supabase will append the recovery token to this URL
       // The redirect URL configured in Supabase dashboard should match this
-      const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}`,
+      const redirectTo = `${window.location.origin}`;
+      console.log('Sending password reset email to:', email);
+      console.log('Redirect URL:', redirectTo);
+      
+      const { data, error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: redirectTo,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Password reset email error:', error);
+        throw error;
+      }
 
+      console.log('Password reset email sent successfully', data);
+      
       setAuthState((prev) => ({
         ...prev,
         loading: false,
@@ -184,11 +193,19 @@ export function useSupabase() {
       const authError = error as AuthError;
       let errorMessage = authError.message;
       
+      console.error('Password reset email failed:', {
+        error: authError,
+        message: errorMessage,
+        code: authError.status,
+      });
+      
       // Provide more helpful error messages
-      if (errorMessage.includes('rate limit')) {
+      if (errorMessage.includes('rate limit') || errorMessage.includes('too many')) {
         errorMessage = 'Too many requests. Please wait a moment and try again.';
-      } else if (errorMessage.includes('not found')) {
+      } else if (errorMessage.includes('not found') || errorMessage.includes('user not found')) {
         errorMessage = 'No account found with this email address.';
+      } else if (errorMessage.includes('email')) {
+        errorMessage = `Email error: ${errorMessage}`;
       }
       
       setAuthState((prev) => ({
