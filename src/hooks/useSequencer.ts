@@ -64,6 +64,36 @@ export function useSequencer() {
     setCurrentStep(null);
   }, []);
 
+  const loadBeat = useCallback((sequencerData: boolean[][], beatBPM: number) => {
+    // Stop any playing audio
+    if (isPlaying) {
+      audioEngine.stop();
+      setIsPlaying(false);
+      setCurrentStep(null);
+    }
+    
+    // Validate and load the sequencer data
+    // Ensure it matches expected dimensions (5 tracks × 16 steps)
+    const validatedData = sequencerData.map((track, trackIndex) => {
+      if (trackIndex >= DRUM_TRACKS.length) return Array(STEPS_PER_BAR).fill(false);
+      return track.slice(0, STEPS_PER_BAR).map(step => Boolean(step));
+    });
+    
+    // Pad if needed
+    while (validatedData.length < DRUM_TRACKS.length) {
+      validatedData.push(Array(STEPS_PER_BAR).fill(false));
+    }
+    
+    setSequencerState(validatedData);
+    setBpm(beatBPM);
+    setCurrentStep(null);
+    
+    // Update audio engine if initialized
+    if (audioEngine) {
+      audioEngine.updateSequencerState(validatedData);
+    }
+  }, [isPlaying]);
+
   const handleBPMChange = useCallback((newBPM: number) => {
     setBpm(newBPM);
     if (isPlaying) {
@@ -80,6 +110,7 @@ export function useSequencer() {
     start,
     stop,
     reset,
+    loadBeat,
     setBPM: handleBPMChange,
   };
 }
