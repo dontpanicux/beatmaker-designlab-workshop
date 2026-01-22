@@ -7,6 +7,7 @@ export interface AuthState {
   session: Session | null;
   loading: boolean;
   error: string | null;
+  isPasswordRecovery: boolean;
 }
 
 export function useSupabase() {
@@ -15,6 +16,7 @@ export function useSupabase() {
     session: null,
     loading: true,
     error: null,
+    isPasswordRecovery: false,
   });
 
   useEffect(() => {
@@ -31,13 +33,25 @@ export function useSupabase() {
     // Listen for auth changes
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
-      setAuthState({
-        user: session?.user ?? null,
-        session,
-        loading: false,
-        error: null,
-      });
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      // Handle password recovery event - don't auto-login, just set the recovery flag
+      if (event === 'PASSWORD_RECOVERY') {
+        setAuthState({
+          user: session?.user ?? null,
+          session: null, // Don't set session to prevent auto-login
+          loading: false,
+          error: null,
+          isPasswordRecovery: true,
+        });
+      } else {
+        setAuthState({
+          user: session?.user ?? null,
+          session,
+          loading: false,
+          error: null,
+          isPasswordRecovery: false,
+        });
+      }
     });
 
     return () => {
@@ -129,6 +143,7 @@ export function useSupabase() {
         session: null,
         loading: false,
         error: null,
+        isPasswordRecovery: false,
       });
 
       return { error: null };
@@ -143,11 +158,93 @@ export function useSupabase() {
     }
   };
 
+  const sendPasswordResetEmail = async (email: string) => {
+    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      // Use the current origin - Supabase will append the recovery token to this URL
+      // The redirect URL configured in Supabase dashboard should match this
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}`,
+      });
+
+      if (error) throw error;
+
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: null,
+      }));
+
+      return { error: null };
+    } catch (error) {
+      const authError = error as AuthError;
+      let errorMessage = authError.message;
+      
+      // Provide more helpful error messages
+      if (errorMessage.includes('rate limit')) {
+        errorMessage = 'Too many requests. Please wait a moment and try again.';
+      } else if (errorMessage.includes('not found')) {
+        errorMessage = 'No account found with this email address.';
+      }
+      
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: errorMessage,
+      }));
+      return { error: errorMessage };
+    }
+  };
+
+  const resetPassword = async (newPassword: string) => {
+    setAuthState((prev) => ({ ...prev, loading: true, error: null }));
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+
+      if (error) throw error;
+
+      // After successful password reset, sign out the user
+      // They should log in with their new password
+      await supabase.auth.signOut();
+
+      setAuthState({
+        user: null,
+        session: null,
+        loading: false,
+        error: null,
+        isPasswordRecovery: false,
+      });
+
+      return { error: null };
+    } catch (error) {
+      const authError = error as AuthError;
+      let errorMessage = authError.message;
+      
+      // Provide more helpful error messages
+      if (errorMessage.includes('same as')) {
+        errorMessage = 'New password must be different from your current password.';
+      } else if (errorMessage.includes('weak')) {
+        errorMessage = 'Password is too weak. Please choose a stronger password.';
+      }
+      
+      setAuthState((prev) => ({
+        ...prev,
+        loading: false,
+        error: errorMessage,
+      }));
+      return { error: errorMessage };
+    }
+  };
+
   return {
     ...authState,
     signUp,
     signIn,
     signOut,
-    isAuthenticated: !!authState.user,
+    sendPasswordResetEmail,
+    resetPassword,
+    isAuthenticated: !!authState.user && !!authState.session,
   };
 }

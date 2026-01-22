@@ -3,10 +3,11 @@ import { useState, FormEvent } from 'react';
 interface LoginFormProps {
   onLogin: (email: string, password: string) => Promise<{ error: string | null }>;
   onSwitchToSignup: () => void;
+  onSwitchToForgotPassword: () => void;
   loading?: boolean;
 }
 
-export function LoginForm({ onLogin, onSwitchToSignup, loading = false }: LoginFormProps) {
+export function LoginForm({ onLogin, onSwitchToSignup, onSwitchToForgotPassword, loading = false }: LoginFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -48,9 +49,19 @@ export function LoginForm({ onLogin, onSwitchToSignup, loading = false }: LoginF
         </div>
 
         <div>
-          <label htmlFor="login-password" className="block text-sm font-medium text-gray-300 mb-2">
-            Password
-          </label>
+          <div className="flex items-center justify-between mb-2">
+            <label htmlFor="login-password" className="block text-sm font-medium text-gray-300">
+              Password
+            </label>
+            <button
+              type="button"
+              onClick={onSwitchToForgotPassword}
+              disabled={isSubmitting || loading}
+              className="text-sm text-blue-400 hover:text-blue-300 transition-colors disabled:opacity-50"
+            >
+              Forgot Password?
+            </button>
+          </div>
           <input
             id="login-password"
             type="password"

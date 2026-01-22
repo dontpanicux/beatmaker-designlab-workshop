@@ -7,12 +7,14 @@ import { SequencerGrid } from './components/Sequencer/SequencerGrid';
 import { TransportControls } from './components/Transport/TransportControls';
 import { LoginForm } from './components/Auth/LoginForm';
 import { SignupForm } from './components/Auth/SignupForm';
+import { ForgotPasswordForm } from './components/Auth/ForgotPasswordForm';
+import { ResetPasswordForm } from './components/Auth/ResetPasswordForm';
 import { SaveBeatModal } from './components/Beats/SaveBeatModal';
 import { BeatLibrary } from './components/Beats/BeatLibrary';
 import { StartNewBeatModal } from './components/Beats/StartNewBeatModal';
 
 function App() {
-  const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login');
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isStartNewModalOpen, setIsStartNewModalOpen] = useState(false);
@@ -21,7 +23,7 @@ function App() {
   const [originalBeatState, setOriginalBeatState] = useState<{ sequencerState: boolean[][]; bpm: number } | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   
-  const { user, loading: authLoading, signIn, signUp, signOut, isAuthenticated } = useSupabase();
+  const { user, loading: authLoading, signIn, signUp, signOut, isAuthenticated, sendPasswordResetEmail, resetPassword, isPasswordRecovery } = useSupabase();
   const { isInitialized, isLoading, error, needsInteraction, initializeAudio } = useAudioEngine();
   const { saveBeat, updateBeat, listBeats, deleteBeat, loading: saveLoading, error: saveError, clearError } = useBeats();
   
@@ -46,6 +48,23 @@ function App() {
 
   // Track the previous user ID to detect user changes
   const previousUserIdRef = useRef<string | undefined>(user?.id);
+
+  // Check for password recovery token in URL on mount
+  useEffect(() => {
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    const accessToken = hashParams.get('access_token');
+    
+    // If we have a recovery token in the URL, switch to reset mode
+    if (type === 'recovery' && accessToken) {
+      setAuthMode('reset');
+      // Clear the hash from URL for cleaner UX
+      window.history.replaceState(null, '', window.location.pathname);
+    } else if (isPasswordRecovery) {
+      // If Supabase detected password recovery event, switch to reset mode
+      setAuthMode('reset');
+    }
+  }, [isPasswordRecovery]);
 
   // Reset sequencer when user changes (login/logout)
   useEffect(() => {
@@ -242,11 +261,24 @@ function App() {
             <LoginForm
               onLogin={signIn}
               onSwitchToSignup={() => setAuthMode('signup')}
+              onSwitchToForgotPassword={() => setAuthMode('forgot')}
+              loading={authLoading}
+            />
+          ) : authMode === 'signup' ? (
+            <SignupForm
+              onSignup={signUp}
+              onSwitchToLogin={() => setAuthMode('login')}
+              loading={authLoading}
+            />
+          ) : authMode === 'forgot' ? (
+            <ForgotPasswordForm
+              onSendResetEmail={sendPasswordResetEmail}
+              onSwitchToLogin={() => setAuthMode('login')}
               loading={authLoading}
             />
           ) : (
-            <SignupForm
-              onSignup={signUp}
+            <ResetPasswordForm
+              onResetPassword={resetPassword}
               onSwitchToLogin={() => setAuthMode('login')}
               loading={authLoading}
             />
