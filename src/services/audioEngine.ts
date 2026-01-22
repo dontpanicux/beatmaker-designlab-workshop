@@ -209,6 +209,10 @@ class AudioEngine {
       player.volume.value = volume;
     }
   }
+
+  getInitialized(): boolean {
+    return this.isInitialized;
+  }
 }
 
 export const audioEngine = new AudioEngine();

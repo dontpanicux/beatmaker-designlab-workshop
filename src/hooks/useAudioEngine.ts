@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { audioEngine } from '../services/audioEngine';
 
 export function useAudioEngine() {
-  const [isInitialized, setIsInitialized] = useState(false);
+  // Check if audio engine is already initialized (e.g., from previous session)
+  const [isInitialized, setIsInitialized] = useState(audioEngine.getInitialized());
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [needsInteraction, setNeedsInteraction] = useState(true);
+  const [needsInteraction, setNeedsInteraction] = useState(!audioEngine.getInitialized());
 
   const initializeAudio = async () => {
     try {

@@ -35,11 +35,12 @@ export function useSupabase() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
-      // Handle password recovery event - don't auto-login, just set the recovery flag
+      // Handle password recovery event - keep session for updateUser to work
+      // but set flag so user isn't considered "authenticated" for UI purposes
       if (event === 'PASSWORD_RECOVERY') {
         setAuthState({
           user: session?.user ?? null,
-          session: null, // Don't set session to prevent auto-login
+          session, // Keep session so updateUser can work
           loading: false,
           error: null,
           isPasswordRecovery: true,
@@ -248,6 +249,7 @@ export function useSupabase() {
     signOut,
     sendPasswordResetEmail,
     resetPassword,
-    isAuthenticated: !!authState.user && !!authState.session,
+    // User is authenticated only if they have both user and session, AND it's not a password recovery flow
+    isAuthenticated: !!authState.user && !!authState.session && !authState.isPasswordRecovery,
   };
 }
