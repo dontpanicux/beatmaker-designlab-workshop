@@ -1,5 +1,3 @@
-import { Beat } from '../../types/beat';
-
 interface StartNewBeatModalProps {
   isOpen: boolean;
   onClose: () => void;

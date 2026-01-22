@@ -23,7 +23,7 @@ function App() {
   
   const { user, loading: authLoading, signIn, signUp, signOut, isAuthenticated } = useSupabase();
   const { isInitialized, isLoading, error, needsInteraction, initializeAudio } = useAudioEngine();
-  const { saveBeat, updateBeat, loadBeat, listBeats, deleteBeat, loading: saveLoading, error: saveError, clearError } = useBeats();
+  const { saveBeat, updateBeat, listBeats, deleteBeat, loading: saveLoading, error: saveError, clearError } = useBeats();
   
   // Check if Supabase is configured
   const isSupabaseConfigured = 
