@@ -23,7 +23,7 @@ function App() {
   const [originalBeatState, setOriginalBeatState] = useState<{ sequencerState: boolean[][]; bpm: number } | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   
-  const { user, loading: authLoading, signIn, signUp, signOut, isAuthenticated, sendPasswordResetEmail, resetPassword, isPasswordRecovery } = useSupabase();
+  const { user, session, loading: authLoading, signIn, signUp, signOut, isAuthenticated, sendPasswordResetEmail, resetPassword, isPasswordRecovery } = useSupabase();
   const { isInitialized, isLoading, error, needsInteraction, initializeAudio } = useAudioEngine();
   const { saveBeat, updateBeat, listBeats, deleteBeat, loading: saveLoading, error: saveError, clearError } = useBeats();
   
@@ -58,8 +58,8 @@ function App() {
     // If we have a recovery token in the URL, switch to reset mode
     if (type === 'recovery' && accessToken) {
       setAuthMode('reset');
-      // Clear the hash from URL for cleaner UX
-      window.history.replaceState(null, '', window.location.pathname);
+      // Don't clear the hash immediately - let Supabase process it first
+      // The hash will be cleared after successful password reset
     } else if (isPasswordRecovery) {
       // If Supabase detected password recovery event, switch to reset mode
       setAuthMode('reset');
@@ -281,6 +281,7 @@ function App() {
               onResetPassword={resetPassword}
               onSwitchToLogin={() => setAuthMode('login')}
               loading={authLoading}
+              hasSession={!!user && !!session}
             />
           )}
         </div>

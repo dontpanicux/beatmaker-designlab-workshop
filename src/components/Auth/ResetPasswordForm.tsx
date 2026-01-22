@@ -4,9 +4,10 @@ interface ResetPasswordFormProps {
   onResetPassword: (newPassword: string) => Promise<{ error: string | null }>;
   onSwitchToLogin: () => void;
   loading?: boolean;
+  hasSession?: boolean;
 }
 
-export function ResetPasswordForm({ onResetPassword, onSwitchToLogin, loading = false }: ResetPasswordFormProps) {
+export function ResetPasswordForm({ onResetPassword, onSwitchToLogin, loading = false, hasSession = true }: ResetPasswordFormProps) {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -53,6 +54,21 @@ export function ResetPasswordForm({ onResetPassword, onSwitchToLogin, loading = 
           <div className="bg-green-900/50 border border-green-700 text-green-200 px-4 py-3 rounded-lg text-sm">
             <p className="font-semibold mb-1">✓ Password updated!</p>
             <p>Your password has been successfully reset. Redirecting to login...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  if (!hasSession) {
+    return (
+      <div className="bg-gray-800 rounded-lg shadow-xl p-6 max-w-md w-full">
+        <h2 className="text-2xl font-bold text-white mb-6 text-center">Reset Password</h2>
+        
+        <div className="space-y-4">
+          <div className="bg-yellow-900/50 border border-yellow-700 text-yellow-200 px-4 py-3 rounded-lg text-sm">
+            <p className="font-semibold mb-1">Loading...</p>
+            <p>Please wait while we verify your password reset link...</p>
           </div>
         </div>
       </div>

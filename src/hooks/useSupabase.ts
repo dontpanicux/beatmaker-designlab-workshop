@@ -203,15 +203,38 @@ export function useSupabase() {
   const resetPassword = async (newPassword: string) => {
     setAuthState((prev) => ({ ...prev, loading: true, error: null }));
     try {
-      const { error } = await supabase.auth.updateUser({
+      // Verify we have an active session before attempting to update password
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+      
+      if (sessionError) {
+        throw new Error(`Session error: ${sessionError.message}`);
+      }
+      
+      if (!session) {
+        throw new Error('No active session found. Please click the password reset link from your email again.');
+      }
+
+      // Update the password
+      const { data, error } = await supabase.auth.updateUser({
         password: newPassword,
       });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Password update error:', error);
+        throw error;
+      }
+
+      // Verify the update was successful
+      if (!data.user) {
+        throw new Error('Password update failed. Please try again.');
+      }
 
       // After successful password reset, sign out the user
       // They should log in with their new password
       await supabase.auth.signOut();
+
+      // Clear the URL hash after successful reset
+      window.history.replaceState(null, '', window.location.pathname);
 
       setAuthState({
         user: null,
@@ -231,7 +254,13 @@ export function useSupabase() {
         errorMessage = 'New password must be different from your current password.';
       } else if (errorMessage.includes('weak')) {
         errorMessage = 'Password is too weak. Please choose a stronger password.';
+      } else if (errorMessage.includes('session')) {
+        errorMessage = 'Session expired. Please click the password reset link from your email again.';
+      } else if (errorMessage.includes('token') || errorMessage.includes('expired')) {
+        errorMessage = 'Password reset link has expired. Please request a new one.';
       }
+      
+      console.error('Password reset error:', errorMessage, error);
       
       setAuthState((prev) => ({
         ...prev,
