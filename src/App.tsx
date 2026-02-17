@@ -5,16 +5,16 @@ import { useSupabase } from './hooks/useSupabase';
 import { useBeats } from './hooks/useBeats';
 import { SequencerGrid } from './components/Sequencer/SequencerGrid';
 import { TransportControls } from './components/Transport/TransportControls';
-import { LoginForm } from './components/Auth/LoginForm';
-import { SignupForm } from './components/Auth/SignupForm';
-import { ForgotPasswordForm } from './components/Auth/ForgotPasswordForm';
-import { ResetPasswordForm } from './components/Auth/ResetPasswordForm';
+import { AuthModal, AuthModalMode } from './components/Auth/AuthModal';
 import { SaveBeatModal } from './components/Beats/SaveBeatModal';
 import { BeatLibrary } from './components/Beats/BeatLibrary';
 import { StartNewBeatModal } from './components/Beats/StartNewBeatModal';
 
 function App() {
-  const [authMode, setAuthMode] = useState<'login' | 'signup' | 'forgot' | 'reset'>('login');
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState<AuthModalMode>('login');
+  const [authModalMessage, setAuthModalMessage] = useState<string | undefined>(undefined);
+  const [pendingActionAfterAuth, setPendingActionAfterAuth] = useState<'save' | 'library' | null>(null);
   const [isSaveModalOpen, setIsSaveModalOpen] = useState(false);
   const [isLibraryOpen, setIsLibraryOpen] = useState(false);
   const [isStartNewModalOpen, setIsStartNewModalOpen] = useState(false);
@@ -49,31 +49,24 @@ function App() {
   // Track the previous user ID to detect user changes
   const previousUserIdRef = useRef<string | undefined>(user?.id);
 
-  // Check for password recovery token in URL and set auth mode accordingly
+  // When password recovery token in URL (or isPasswordRecovery), open auth modal in reset mode
   useEffect(() => {
     const hash = window.location.hash;
-    console.log('App checking for recovery - hash:', hash, 'isPasswordRecovery:', isPasswordRecovery);
-    
     if (hash && hash.length > 1) {
       const hashParams = new URLSearchParams(hash.substring(1));
       const type = hashParams.get('type');
       const accessToken = hashParams.get('access_token');
-      console.log('Hash params:', { type, hasAccessToken: !!accessToken });
-      
-      // If we have a recovery token in the URL, switch to reset mode
       if (type === 'recovery' && accessToken) {
-        console.log('Setting auth mode to reset from URL hash');
-        setAuthMode('reset');
-        // Don't clear the hash immediately - let Supabase process it first
-        // The hash will be cleared after successful password reset
+        setAuthModalMode('reset');
+        setAuthModalMessage(undefined);
+        setIsAuthModalOpen(true);
         return;
       }
     }
-    
-    // If Supabase detected password recovery, switch to reset mode
     if (isPasswordRecovery) {
-      console.log('Setting auth mode to reset from isPasswordRecovery flag');
-      setAuthMode('reset');
+      setAuthModalMode('reset');
+      setAuthModalMessage(undefined);
+      setIsAuthModalOpen(true);
     }
   }, [isPasswordRecovery]);
 
@@ -242,67 +235,39 @@ function App() {
     );
   }
 
-  // Show authentication UI if not authenticated
-  if (!isAuthenticated) {
-    return (
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900">
-        <div className="w-full max-w-md">
-          <div className="text-center mb-8">
-            <h1 className="text-5xl font-bold text-white mb-2 drop-shadow-lg">
-              🎵 Beatmaker
-            </h1>
-            <p className="text-gray-200 text-lg">Create beats online for free</p>
-          </div>
-          
-          {!isSupabaseConfigured && (
-            <div className="bg-yellow-900/50 border border-yellow-700 text-yellow-200 px-4 py-3 rounded-lg text-sm mb-4">
-              <p className="font-semibold mb-1">Supabase not configured</p>
-              <p className="text-xs">
-                Create a <code className="bg-yellow-800 px-1 py-0.5 rounded">.env</code> file with your Supabase credentials.
-                See <code className="bg-yellow-800 px-1 py-0.5 rounded">.env.example</code> for reference.
-              </p>
-            </div>
-          )}
-          
-          {authLoading ? (
-            <div className="flex items-center justify-center min-h-[400px]">
-              <div className="text-white text-xl">Loading...</div>
-            </div>
-          ) : authMode === 'login' ? (
-            <LoginForm
-              onLogin={signIn}
-              onSwitchToSignup={() => setAuthMode('signup')}
-              onSwitchToForgotPassword={() => setAuthMode('forgot')}
-              loading={authLoading}
-            />
-          ) : authMode === 'signup' ? (
-            <SignupForm
-              onSignup={signUp}
-              onSwitchToLogin={() => setAuthMode('login')}
-              loading={authLoading}
-            />
-          ) : authMode === 'forgot' ? (
-            <ForgotPasswordForm
-              onSendResetEmail={sendPasswordResetEmail}
-              onSwitchToLogin={() => setAuthMode('login')}
-              loading={authLoading}
-            />
-          ) : (
-            <ResetPasswordForm
-              onResetPassword={resetPassword}
-              onSwitchToLogin={() => setAuthMode('login')}
-              loading={authLoading}
-              hasSession={!!user && !!session}
-            />
-          )}
-        </div>
-      </div>
-    );
-  }
+  const openAuthModal = (mode: AuthModalMode, message?: string) => {
+    setAuthModalMode(mode);
+    setAuthModalMessage(message);
+    setIsAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setIsAuthModalOpen(false);
+    setAuthModalMessage(undefined);
+    setPendingActionAfterAuth(null);
+  };
+
+  const handleAuthSuccess = () => {
+    if (pendingActionAfterAuth === 'save') {
+      setIsSaveModalOpen(true);
+    } else if (pendingActionAfterAuth === 'library') {
+      setIsLibraryOpen(true);
+    }
+    setPendingActionAfterAuth(null);
+  };
 
   return (
     <div className="min-h-screen p-4 md:p-8">
       <div className="max-w-7xl mx-auto">
+        {!isSupabaseConfigured && (
+          <div className="mb-4 bg-yellow-900/50 border border-yellow-700 text-yellow-200 px-4 py-3 rounded-lg text-sm">
+            <p className="font-semibold mb-1">Sign-in and save disabled</p>
+            <p className="text-xs">
+              Create a <code className="bg-yellow-800 px-1 py-0.5 rounded">.env</code> file with your Supabase credentials to save and load beats.
+              See <code className="bg-yellow-800 px-1 py-0.5 rounded">.env.example</code> for reference.
+            </p>
+          </div>
+        )}
         <header className="text-center mb-8">
           <div className="flex items-center justify-between mb-4">
             <div className="flex-1"></div>
@@ -314,24 +279,37 @@ function App() {
             </div>
             <div className="flex-1 flex justify-end">
               <div className="flex items-center gap-4">
-                <span className="text-gray-300 text-sm">{user?.email}</span>
-                <button
-                  onClick={async () => {
-                    // Stop any playing audio before logging out
-                    if (isPlaying) {
-                      stop();
-                    }
-                    // Reset sequencer before logging out
-                    reset();
-                    // Clear success messages
-                    setSaveSuccess(null);
-                    // Sign out
-                    await signOut();
-                  }}
-                  className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-semibold transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-400"
-                >
-                  Logout
-                </button>
+                {isAuthenticated ? (
+                  <>
+                    <span className="text-gray-300 text-sm">{user?.email}</span>
+                    <button
+                      onClick={async () => {
+                        if (isPlaying) stop();
+                        reset();
+                        setSaveSuccess(null);
+                        await signOut();
+                      }}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-semibold transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-400"
+                    >
+                      Logout
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => openAuthModal('signup')}
+                      className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-sm font-semibold transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-purple-400"
+                    >
+                      Sign Up
+                    </button>
+                    <button
+                      onClick={() => openAuthModal('login')}
+                      className="px-4 py-2 bg-gray-700 hover:bg-gray-600 text-white rounded-lg text-sm font-semibold transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-blue-400"
+                    >
+                      Log In
+                    </button>
+                  </>
+                )}
               </div>
             </div>
           </div>
@@ -384,18 +362,26 @@ function App() {
 
             <div className="flex justify-center gap-4">
               <button
-                onClick={() => setIsLibraryOpen(true)}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    setPendingActionAfterAuth('library');
+                    openAuthModal('login', 'Sign in to view your beats');
+                  } else {
+                    setIsLibraryOpen(true);
+                  }
+                }}
                 className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-lg font-semibold transition-all shadow-lg hover:shadow-xl focus:outline-none focus:ring-4 focus:ring-purple-400"
               >
                 📚 My Beats
               </button>
               <button
                 onClick={() => {
-                  if (currentBeat) {
-                    // If a beat is loaded, update it immediately
+                  if (!isAuthenticated) {
+                    setPendingActionAfterAuth('save');
+                    openAuthModal('login', 'Sign in to save your beats');
+                  } else if (currentBeat) {
                     handleUpdateBeat();
                   } else {
-                    // If no beat is loaded, open modal to name and save new beat
                     setIsSaveModalOpen(true);
                   }
                 }}
@@ -449,6 +435,22 @@ function App() {
               onSaveFirst={currentBeat ? handleUpdateBeat : undefined}
               hasUnsavedChanges={hasUnsavedChanges()}
               currentBeat={currentBeat}
+            />
+
+            <AuthModal
+              isOpen={isAuthModalOpen}
+              onClose={closeAuthModal}
+              onSuccess={handleAuthSuccess}
+              initialMode={authModalMode}
+              message={authModalMessage}
+              loading={authLoading}
+              signIn={signIn}
+              signUp={signUp}
+              sendPasswordResetEmail={sendPasswordResetEmail}
+              resetPassword={resetPassword}
+              user={user}
+              session={session}
+              isPasswordRecovery={isPasswordRecovery}
             />
           </>
         )}
